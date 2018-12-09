@@ -15,9 +15,16 @@ import threading
 from ctypes import *
 from tkinter import *
 
+global chatSocket
+global lobby_id
+global name
+global chat_log
+global chat_client
+global chatlogui
+chatlogui = []
+
 pygame.init()
 pygame.font.init()
-
 
 background = (255, 255, 255)
 black = (0, 0, 0)
@@ -44,31 +51,32 @@ clock = pygame.time.Clock()
 FOOD = []
 ############################################
 # game images
-playerImg = pygame.image.load('player.png')
-food1Img = pygame.image.load('kopiko.png')
-food2Img = pygame.image.load('bluebook.png')
-chatbgImg = pygame.image.load('chat_background.png')
+playerImg = pygame.image.load('Images/player.png')
+food1Img = pygame.image.load('Images/kopiko.png')
+food2Img = pygame.image.load('Images/bluebook.png')
+chatbgImg = pygame.image.load('Images/chat_background.png')
+scImg = pygame.image.load('Images/score_board.png')
+scoreImg = pygame.image.load('Images/score.png') 
 
 # main menu images
-htppgImg = pygame.image.load('how_to_play_page.png')
-backImg = pygame.image.load('back.png')
-playImg = pygame.image.load('play1.png')
-htpImg = pygame.image.load('how_to_play.png')
-quitImg = pygame.image.load('quit.png')
-aplayImg = pygame.image.load('a_play.png')
-ahtpImg = pygame.image.load('a_how_to_play.png')
-aquitImg = pygame.image.load('a_quit.png')
-abackImg = pygame.image.load('a_back.png')
-
+htppgImg = pygame.image.load('Images/how_to_play_page.png')
+backImg = pygame.image.load('Images/back.png')
+playImg = pygame.image.load('Images/play1.png')
+htpImg = pygame.image.load('Images/how_to_play.png')
+quitImg = pygame.image.load('Images/quit.png')
+aplayImg = pygame.image.load('Images/a_play.png')
+ahtpImg = pygame.image.load('Images/a_how_to_play.png')
+aquitImg = pygame.image.load('Images/a_quit.png')
+abackImg = pygame.image.load('Images/a_back.png')
 
 # quit game pop up images
-nextlevelImg = pygame.image.load('next_level.png')
-xbuttonImg = pygame.image.load('x_button.png')
-exitImg = pygame.image.load('exit.png')
-cancelImg = pygame.image.load('cancel.png')
-axbuttonImg = pygame.image.load('a_x_button.png')
-aexitImg = pygame.image.load('a_exit.png')
-acancelImg = pygame.image.load('a_cancel.png')
+nextlevelImg = pygame.image.load('Images/next_level.png')
+xbuttonImg = pygame.image.load('Images/x_button.png')
+exitImg = pygame.image.load('Images/exit.png')
+cancelImg = pygame.image.load('Images/cancel.png')
+axbuttonImg = pygame.image.load('Images/a_x_button.png')
+aexitImg = pygame.image.load('Images/a_exit.png')
+acancelImg = pygame.image.load('Images/a_cancel.png')
 ############################################
 
 def getDistance(pos1,pos2):
@@ -102,6 +110,7 @@ class Player(object):
 			self.level += 1
 			self.size = self.size*1.2
 			self.img = pygame.transform.scale(playerImg, (int(self.size), int(self.size)))
+
 	def move(self):
 		cX, cY = pygame.mouse.get_pos()
 		self.destination = (cX, cY)
@@ -132,6 +141,11 @@ class Player(object):
 		if(self.score == 0):
 			self.img = pygame.transform.scale(playerImg, (100, 100))
 		window.blit(self.img, (self.x, self.y))
+		bigText = pygame.font.Font("freesansbold.ttf", 15)
+		textSurf, textRect =  text_objects(str(self.score), bigText, gray)
+		window.blit(textSurf, (1140, 625\
+
+			))	
 
 class Food(object):
 	def __init__(self):
@@ -154,31 +168,340 @@ def spawn_food(amountOfFood):
 		FOOD.append(food)
 		amountOfFood = amountOfFood + 1
 
+###################################### game #############################################
+def show_score():
+	window.blit(scoreImg, (1040, 618))	
+
+def show_sc():
+	img = pygame.transform.scale(scImg, (150, 150))
+	window.blit(img, (1045, 5))
+
 ###################################### chat #############################################
-def show_chat(socket):
-	mouse = pygame.mouse.get_pos()
+def show_chat():
 	window.blit(chatbgImg, (0, 390))
 
+def showChatLog(addmsgs):
+	index = 0
+	for word in addmsgs:	
+		bigText = pygame.font.Font("freesansbold.ttf", 15)
+		textSurf, textRect =  text_objects(str(addmsgs[index]), bigText, gray)
+		window.blit(textSurf, (20, 410+(18*index)))	
+		index += 1
+
+def updateChatLog(templog):
+	global chatlogui	
+	if(len(templog) <= 10):
+		chatlogui = templog
+	else:
+		del templog[0]
+		chatlogui = templog
+
+def sendMessage(msg):
+    global name
+    packet = tcp_packet_pb2.TcpPacket.ChatPacket()
+    packet.type = 3
+    packet.message = msg
+    packet.player.name = name
+    chatSocket.send(packet.SerializeToString())
+
+def chatListenerGUI():
+    global chat_log
+    while True:
+        packet = tcp_packet_pb2.TcpPacket()
+        data = chatSocket.recv(1024)
+        data1 = data
+        packet.ParseFromString(data1)
+        if packet.type == 0:
+            packet = tcp_packet_pb2.TcpPacket.DisconnectPacket()
+            packet.ParseFromString(data)
+            if packet.update == 0:
+                chat_log = chat_log + '\n' + packet.player.name + " has disconnected!"
+            elif packet.update == 1:
+                chat_log = chat_log + '\n' + packet.player.name + " has lost connection!"
+        elif packet.type == 1:
+            packet = tcp_packet_pb2.TcpPacket.ConnectPacket()
+            packet.ParseFromString(data)
+            chat_log = chat_log + '\n' + packet.player.name + " successfully connected to lobby " + packet.lobby_id
+        elif packet.type == 2:
+            packet = tcp_packet_pb2.TcpPacket.CreateLobbyPacket()
+            packet.ParseFromString(data)
+            chat_log = chat_log + '\n' + "Lobby " + packet.lobby_id + " successfully created!"
+        elif packet.type == 3:
+            packet = tcp_packet_pb2.TcpPacket.ChatPacket()
+            packet.ParseFromString(data)
+            chat_log = chat_log + '\n' + packet.player.name + ": " + packet.message
+        elif packet.type == 4:
+            packet = tcp_packet_pb2.TcpPacket.PlayerListPacket()
+            packet.ParseFromString(data)
+            chat_log = chat_log + '\n' + packet.player_list
+        elif packet.type == 5:
+            packet = tcp_packet_pb2.TcpPacket.ErrLdnePacket()
+            packet.ParseFromString(data)
+            chat_log = chat_log + '\n' + "Error: " + packet.err_msg
+        elif packet.type == 6:
+            packet = tcp_packet_pb2.TcpPacket.ErrLfullPacket()
+            packet.ParseFromString(data)
+            chat_log = chat_log + '\n' + "Error: " + packet.err_msg
+        elif packet.type == 7:
+            packet = tcp_packet_pb2.TcpPacket.ErrPacket()
+            packet.ParseFromString(data)
+            chat_log = chat_log + '\n' + "Error: " + packet.err_msg
+
+def chatListener():
+	global chatSocket
+	templog = []
+	while True:
+		packet = tcp_packet_pb2.TcpPacket()
+		data = chatSocket.recv(1024)
+		data1 = data
+		packet.ParseFromString(data1)
+		if packet.type == 0:
+			packet = tcp_packet_pb2.TcpPacket.DisconnectPacket()
+			packet.ParseFromString(data)
+			if packet.update == 0:
+				print(packet.player.name, " has disconnected!")
+				templog.append(packet.player.name + " has disconnected!")
+			elif packet.update == 1:
+				print(packet.player.name, " has lost connection!")
+				templog.append(packet.player.name + " has lost connection!")
+		elif packet.type == 1:
+			packet = tcp_packet_pb2.TcpPacket.ConnectPacket()
+			packet.ParseFromString(data)
+			print(packet.player.name, " successfully connected to lobby ", packet.lobby_id)
+			templog.append(packet.player.name + " successfully connected to lobby " + packet.lobby_id)
+		elif packet.type == 2:
+			packet = tcp_packet_pb2.TcpPacket.CreateLobbyPacket()
+			packet.ParseFromString(data)
+			print("Lobby ", packet.lobby_id, " successfully created!")
+			templog.append("Lobby " + packet.lobby_id + " successfully created!")
+		elif packet.type == 3:
+			packet = tcp_packet_pb2.TcpPacket.ChatPacket()
+			packet.ParseFromString(data)
+			print(packet.player.name, ": ", packet.message)
+			templog.append(packet.player.name + ": " + packet.message)
+		elif packet.type == 4:
+			packet = tcp_packet_pb2.TcpPacket.PlayerListPacket()
+			packet.ParseFromString(data)
+			print(packet.player_list)
+			templog.append(packet.player_list)
+		elif packet.type == 5:
+			packet = tcp_packet_pb2.TcpPacket.ErrLdnePacket()
+			packet.ParseFromString(data)
+			print("Error: ", packet.err_message)
+			templog.append("Error: " + packet.err_message)
+		elif packet.type == 6:
+			packet = tcp_packet_pb2.TcpPacket.ErrLfullPacket()
+			packet.ParseFromString(data)
+			print("Error: ", packet.err_message)
+			templog.append("Error: " + packet.err_message)		
+		elif packet.type == 7:
+			packet = tcp_packet_pb2.TcpPacket.ErrPacket()
+			packet.ParseFromString(data)
+			print("Error: ", packet.err_message)
+			templog.append("Error: " + packet.err_message)		
+		updateChatLog(templog)
+
+def createLobby(max_players):
+	global socket
+	packet = tcp_packet_pb2.TcpPacket.CreateLobbyPacket()
+	packet.type = 2
+	packet.max_players =  max_players
+	socket.send(packet.SerializeToString())
+	data = socket.recv(1024)
+	packet.ParseFromString(data)
+	return packet.lobby_id
+
+def startChat(name, lobby_id):
+	global chatSocket
+
+	chatSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	chatSocket.connect(('202.92.144.45', 80))
+
+	chatListenerThread = threading.Thread(target = chatListener)
+	chatListenerThread.daemon = True
+	chatListenerThread.start()
+
+	packet = tcp_packet_pb2.TcpPacket.ConnectPacket()
+	packet.type = 1
+	packet.lobby_id = lobby_id
+	packet.player.name = name
+	chatSocket.send(packet.SerializeToString())
+
+def startGame():
+	global name
+	global lobby_id
+	##########################
+	#	SOURCE:
+	#	https://stackoverflow.com/questions/46390231/how-to-create-a-text-input-box-with-pygame
+	##########################
+
+	font = pygame.font.Font(None, 32)
+	clock = pygame.time.Clock()
+	input_box = pygame.Rect(530, 309, 140, 32)
+	color_inactive = pygame.Color('lightskyblue3')
+	color_active = pygame.Color('dodgerblue2')
+	color = color_inactive
+	active = False
+	text = 'Enter name here'
+	done = False
+
+	while not done:
+		for event in pygame.event.get():
+			if event.type == pygame.QUIT:
+				done = True
+			if event.type == pygame.MOUSEBUTTONDOWN:
+				# If the user clicked on the input_box rect.
+				if input_box.collidepoint(event.pos):
+					# Toggle the active variable.
+					active = not active
+					text = ''
+				else:
+					active = False
+				# Change the current color of the input box.
+				color = color_active if active else color_inactive
+			if event.type == pygame.KEYDOWN:
+				if active:
+					if event.key == pygame.K_RETURN:
+						name = text
+						done = True
+						text = 'Enter lobby id here'
+					elif event.key == pygame.K_BACKSPACE:
+						text = text[:-1]
+					else:
+						text += event.unicode
+
+		window.fill((30, 30, 30))
+		# Render the current text.
+		txt_surface = font.render(text, True, color)
+		# Resize the box if the text is too long.
+		width = max(200, txt_surface.get_width()+10)
+		input_box.w = width
+		# Blit the text.
+		window.blit(txt_surface, (input_box.x+5, input_box.y+5))
+		# Blit the input_box rect.
+		pygame.draw.rect(window, color, input_box, 2)
+
+		pygame.display.flip()
+		clock.tick(30)
+
+	active = False
+	done = False
+
+	while not done:
+		for event in pygame.event.get():
+			if event.type == pygame.QUIT:
+				done = True
+			if event.type == pygame.MOUSEBUTTONDOWN:
+				# If the user clicked on the input_box rect.
+				if input_box.collidepoint(event.pos):
+					# Toggle the active variable.
+					active = not active
+					text = ''
+				else:
+					active = False
+				# Change the current color of the input box.
+				color = color_active if active else color_inactive
+			if event.type == pygame.KEYDOWN:
+				if active:
+					if event.key == pygame.K_RETURN:
+						lobby_id = text
+						done = True
+						text = ''
+					elif event.key == pygame.K_BACKSPACE:
+						text = text[:-1]
+					else:
+						text += event.unicode
+
+		window.fill((30, 30, 30))
+		# Render the current text.
+		txt_surface = font.render(text, True, color)
+		# Resize the box if the text is too long.
+		width = max(200, txt_surface.get_width()+10)
+		input_box.w = width
+		# Blit the text.
+		window.blit(txt_surface, (input_box.x+5, input_box.y+5))
+		# Blit the input_box rect.
+		pygame.draw.rect(window, color, input_box, 2)
+
+		pygame.display.flip()
+		clock.tick(30)
+
+	startChat(name, lobby_id)
 #########################################################################################
 def game_loop():
 	x = (SCREEN_WIDTH * 0.45)
 	y = (SCREEN_HEIGHT * 0.45)
 	player = Player(x, y)
 	
-	while(True):
-		window.fill(background)
+	font = pygame.font.Font(None, 25)
+	clock = pygame.time.Clock()
+	input_box = pygame.Rect(10, 600, 140, 25)
+	color_inactive = pygame.Color(('gray'))
+	color_active = pygame.Color('black')
+	color = color_inactive
+	active = False
+	text = 'Enter message here'
+	done = False
 
-		for e in pygame.event.get():
-			if(e.type == pygame.QUIT):
+	while not done:
+		window.fill(background)
+		for event in pygame.event.get():
+			if(event.type == pygame.QUIT):
 				exit_game(1)
+			if event.type == pygame.QUIT:
+				done = True
+			if event.type == pygame.MOUSEBUTTONDOWN:
+				# If the user clicked on the input_box rect.
+				if input_box.collidepoint(event.pos):
+					# Toggle the active variable.
+					active = not active
+					text = ''
+				else:
+					active = False
+				# Change the current color of the input box.
+				color = color_active if active else color_inactive
+			if event.type == pygame.KEYDOWN:
+				if active:
+					if event.key == pygame.K_RETURN:
+						# chat_client.sendMessage(text)
+						sendMessage(text)
+						active = False
+						color = color_active if active else color_inactive
+						text = 'Enter message here'
+					elif event.key == pygame.K_BACKSPACE:
+						text = text[:-1]
+					else:
+						text += event.unicode	
+				else:
+					if event.key == pygame.K_RETURN:
+						active = not active
+						text = ''
+						color = color_active if active else color_inactive
+
 		player.update()
-		player.render(window)
-		
+	
 		spawn_food(len(FOOD))
 		for item in FOOD:
 			item.render(window)
 
-		show_chat(socket)
+		player.render(window)
+
+		# Render the current text.
+		txt_surface = font.render(text, True, color)
+		# Resize the box if the text is too long.
+		width = max(200, txt_surface.get_width()+10)
+		input_box.w = width
+		# Blit the text.
+		window.blit(txt_surface, (input_box.x+5, input_box.y+5))
+		# Blit the input_box rect.
+		pygame.draw.rect(window, color, input_box, 2)
+
+		show_chat()
+		show_sc()
+		show_score()
+		showChatLog(chatlogui)
+
+		# show_chat(socket)
 		pygame.display.update()
 
 		clock.tick(50)
@@ -189,6 +512,7 @@ def text_objects(text, font, color):
 
 def actions(action):
 	if action == 1:
+		startGame()
 		game_loop()
 	if action == 2:
 		main()
@@ -257,6 +581,8 @@ def create_menu():
 	menu_button(mouse, 550, 470, 100, 50, 500, 470, quitImg, aquitImg, 4)	
 
 def main():
+	global  chat_log
+	chat_log = ''
 	while(True):
 		window.fill(background)
 
