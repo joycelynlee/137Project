@@ -1,13 +1,13 @@
 # 137Project - AGARIO
 
-Title is a multiplayer Python game that uses TCP for in-game chat and UDP as a game server.
+AGARIO, a remake of the Agar.io game, is a multiplayer game written in Python that uses TCP for in-game chat and UDP as a game server.
 
 ## Installation
-Use the package manager pip to install AGARIO.
-```bash
-pip install pygame
-```
-Make sure to have protobuf for Python installed. There are installation instruction on Google Protobuf's Github repository here: https://github.com/protocolbuffers/protobuf/tree/master/python
+### Linux
+1. Make sure that your computer has Python 3 installed by typing ```bash python3 --version```
+
+2. Use the package manager pip to install pygame.```bash pip install pygame```
+3. Make sure to have protobuf for Python installed. There are installation instruction on Google Protobuf's Github repository here: https://github.com/protocolbuffers/protobuf/tree/master/python
 
 ## Usage
 First, run server.py. This will generate a lobby code that the players will use to enter the lobby.
@@ -21,6 +21,10 @@ python3 client.py
 ```
 Players that want to join must run client.py
 
-## Game Instructions and Mechanics
-1. To join a game room, you must enter your name and the lobby code.
-2. To win, you must consume all of the food that will appear. Your avatar will increase in size and
+## How to play
+### Start a game
+To join a game room, you must enter your name and the lobby code.
+### Games rules
+To win, you must consume food that will appear. The number of food is limited and the player with the biggest size and highest score will be the winner.
+### Controls
+Use your mouse to control your avatar.
