@@ -18,7 +18,7 @@ Then run the client.
 ```bash
 python agar.py
 ```
-Players that want to join must run client.py
+Players that want to join must run the client.
 
 ## How to play
 ### Start a game
