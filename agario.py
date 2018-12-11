@@ -25,6 +25,7 @@ chatlogui = []
 
 pygame.init()
 pygame.font.init()
+pygame.mixer.pre_init(44100, 16, 2, 4096)
 
 background = (255, 255, 255)
 black = (0, 0, 0)
@@ -49,9 +50,26 @@ pygame.display.update()
 clock = pygame.time.Clock()
 
 FOOD = []
+
+# SOUND #
+############################################
+global soundFlag
+soundFlag = 0
+
+eatSound = pygame.mixer.Sound('Sounds/eat.wav')
+pygame.mixer.music.load('Sounds/bgm.mp3')
+
+# pygame.mixer.music.load('Sounds/game_over.mp3')
+############################################
+
+# IMAGES #
 ############################################
 # game images
+global playerImg
 playerImg = pygame.image.load('Images/player.png')
+player2Img = pygame.image.load('Images/player2.png')
+player3Img = pygame.image.load('Images/player3.png')
+
 food1Img = pygame.image.load('Images/kopiko.png')
 food2Img = pygame.image.load('Images/bluebook.png')
 chatbgImg = pygame.image.load('Images/chat_background.png')
@@ -59,15 +77,26 @@ scImg = pygame.image.load('Images/score_board.png')
 scoreImg = pygame.image.load('Images/score.png') 
 
 # main menu images
-htppgImg = pygame.image.load('Images/how_to_play_page.png')
+htpImg = pygame.image.load('Images/how_to_play.png')
 backImg = pygame.image.load('Images/back.png')
 playImg = pygame.image.load('Images/play1.png')
-htpImg = pygame.image.load('Images/how_to_play.png')
 quitImg = pygame.image.load('Images/quit.png')
 aplayImg = pygame.image.load('Images/a_play.png')
 ahtpImg = pygame.image.load('Images/a_how_to_play.png')
 aquitImg = pygame.image.load('Images/a_quit.png')
 abackImg = pygame.image.load('Images/a_back.png')
+nameImg = pygame.image.load('Images/name.png')
+lobbyImg = pygame.image.load('Images/lobby.png')
+
+# how to play
+global htppage
+htppage = 1
+htppgImg = pygame.image.load('Images/how_to_play_page.png')
+htppg2Img = pygame.image.load('Images/how_to_play_page_2.png')
+nextImg = pygame.image.load('Images/next.png')
+anextImg = pygame.image.load('Images/a_next.png')
+prevImg = pygame.image.load('Images/prev.png')
+aprevImg = pygame.image.load('Images/a_prev.png')
 
 # quit game pop up images
 nextlevelImg = pygame.image.load('Images/next_level.png')
@@ -133,7 +162,8 @@ class Player(object):
 
 	def collisionDetection(self):
 		for item in FOOD:
-			if(getDistance((item.x, item.y), (self.x, self.y)) <= ((self.size/1.8)+45)):
+			if(getDistance((item.x+(item.size/2), item.y+(item.size/2)), (self.x+(self.size/2), self.y+(self.size/2))) <= self.size):
+				pygame.mixer.Sound.play(eatSound)
 				self.score += 1
 				FOOD.remove(item)
 
@@ -143,9 +173,7 @@ class Player(object):
 		window.blit(self.img, (self.x, self.y))
 		bigText = pygame.font.Font("freesansbold.ttf", 15)
 		textSurf, textRect =  text_objects(str(self.score), bigText, gray)
-		window.blit(textSurf, (1140, 625\
-
-			))	
+		window.blit(textSurf, (1140, 625))	
 
 class Food(object):
 	def __init__(self):
@@ -167,6 +195,29 @@ def spawn_food(amountOfFood):
 		food = Food()
 		FOOD.append(food)
 		amountOfFood = amountOfFood + 1
+###################################### choose player ######################
+def choose_player_img():
+	global playerImg
+	bigText = pygame.font.Font("freesansbold.ttf", 40)
+	textSurf, textRect =  text_objects("Select Player", bigText, maroon)	
+	while(True):
+		window.fill(background)
+
+		for e in pygame.event.get():
+			if(e.type == pygame.QUIT):
+				exit_game(1)
+
+		window.blit(textSurf, (475, 100))
+		mouse = pygame.mouse.get_pos()
+		a = pygame.transform.scale(playerImg, (200, 200))
+		b = pygame.transform.scale(player2Img, (200, 200))
+		c = pygame.transform.scale(player3Img, (200, 200))
+		menu_button(mouse, 220, 250, 200, 200, 220, 300, a, a, 11)
+		menu_button(mouse, 500, 250, 200, 200, 500, 300, b, b, 12)
+		menu_button(mouse, 780, 250, 200, 200, 780, 300, c, c, 13)				
+		
+		pygame.display.update()
+		clock.tick(20)	
 
 ###################################### game #############################################
 def show_score():
@@ -311,6 +362,7 @@ def createLobby(max_players):
 	packet.ParseFromString(data)
 	return packet.lobby_id
 
+
 def startChat(name, lobby_id):
 	global chatSocket
 
@@ -338,8 +390,8 @@ def startGame():
 	font = pygame.font.Font(None, 32)
 	clock = pygame.time.Clock()
 	input_box = pygame.Rect(530, 309, 140, 32)
-	color_inactive = pygame.Color('lightskyblue3')
-	color_active = pygame.Color('dodgerblue2')
+	color_inactive = gray
+	color_active = black
 	color = color_inactive
 	active = False
 	text = 'Enter name here'
@@ -364,22 +416,18 @@ def startGame():
 					if event.key == pygame.K_RETURN:
 						name = text
 						done = True
-						text = 'Enter lobby id here'
+						text = 'Enter lobby ID here'
 					elif event.key == pygame.K_BACKSPACE:
 						text = text[:-1]
 					else:
 						text += event.unicode
 
-		window.fill((30, 30, 30))
+		window.fill(background)
+		window.blit(nameImg, (SCREEN_WIDTH/2-120, SCREEN_HEIGHT/2-125))		
 		# Render the current text.
 		txt_surface = font.render(text, True, color)
-		# Resize the box if the text is too long.
-		width = max(200, txt_surface.get_width()+10)
-		input_box.w = width
 		# Blit the text.
 		window.blit(txt_surface, (input_box.x+5, input_box.y+5))
-		# Blit the input_box rect.
-		pygame.draw.rect(window, color, input_box, 2)
 
 		pygame.display.flip()
 		clock.tick(30)
@@ -387,7 +435,7 @@ def startGame():
 	active = False
 	done = False
 
-	while not done:
+	while not done:	
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				done = True
@@ -412,16 +460,12 @@ def startGame():
 					else:
 						text += event.unicode
 
-		window.fill((30, 30, 30))
+		window.fill(background)
+		window.blit(lobbyImg, (SCREEN_WIDTH/2-120, SCREEN_HEIGHT/2-125))
 		# Render the current text.
 		txt_surface = font.render(text, True, color)
-		# Resize the box if the text is too long.
-		width = max(200, txt_surface.get_width()+10)
-		input_box.w = width
 		# Blit the text.
 		window.blit(txt_surface, (input_box.x+5, input_box.y+5))
-		# Blit the input_box rect.
-		pygame.draw.rect(window, color, input_box, 2)
 
 		pygame.display.flip()
 		clock.tick(30)
@@ -429,6 +473,7 @@ def startGame():
 	startChat(name, lobby_id)
 #########################################################################################
 def game_loop():
+	pygame.mixer.music.play(-1)	
 	x = (SCREEN_WIDTH * 0.45)
 	y = (SCREEN_HEIGHT * 0.45)
 	player = Player(x, y)
@@ -511,6 +556,9 @@ def text_objects(text, font, color):
 	return textSurface, textSurface.get_rect()
 
 def actions(action):
+	global htppage
+	global playerImg
+
 	if action == 1:
 		startGame()
 		game_loop()
@@ -524,6 +572,34 @@ def actions(action):
 	if action == 5:
 		pygame.quit()
 		quit()
+	if action == 6:
+		if soundFlag == 1:
+			pygame.mixer.music.play(-1)
+			set_sound_flag(0)
+		else:
+			pygame.mixer.music.stop()
+			set_sound_flag(1)
+	if action == 7:
+		htppage = 2
+	if action == 8:
+		htppage = 1
+	if action == 10:
+		choose_player_img()
+	if action == 11:
+		startGame()
+		game_loop()
+	if action == 12:
+		playerImg = player2Img
+		startGame()
+		game_loop()
+	if action == 13:
+		playerImg = player3Img
+		startGame()
+		game_loop()
+
+def set_sound_flag(switch):
+	global soundFlag
+	soundFlag = switch
 
 def menu_button(mouse, x, y, w, h, i_x, i_y, i_img, a_img, action):
 	click = pygame.mouse.get_pressed()
@@ -537,8 +613,13 @@ def menu_button(mouse, x, y, w, h, i_x, i_y, i_img, a_img, action):
 
 def show_how_to_play():
 	mouse = pygame.mouse.get_pos()
-	window.blit(htppgImg, (0, 0))
-	menu_button(mouse, 1080, 570, 110, 50, 1030, 570, backImg, abackImg, 2)	
+	if htppage == 1:
+		window.blit(htppgImg, (0, 0))
+		menu_button(mouse, 1080, 470, 80, 80, 1080, 470, nextImg, anextImg, 7)	
+	else:
+		window.blit(htppg2Img, (0, 0))
+		menu_button(mouse, 990, 470, 80, 80, 990, 470, prevImg, aprevImg, 8)	
+	menu_button(mouse, 1080, 570, 110, 50, 1030, 570, backImg, abackImg, 2)		
 
 def go_to_how_to_play():
 	while(True):
@@ -576,11 +657,11 @@ def create_menu():
 	window.blit(textSurf, textRect)
 
 	mouse = pygame.mouse.get_pos()
-	menu_button(mouse, 550, 350, 100, 50, 500, 350, playImg, aplayImg, 1)
+	menu_button(mouse, 550, 350, 100, 50, 500, 350, playImg, aplayImg, 10)
 	menu_button(mouse, 550, 410, 100, 50, 500, 410, htpImg, ahtpImg, 3)
 	menu_button(mouse, 550, 470, 100, 50, 500, 470, quitImg, aquitImg, 4)	
 
-def main():
+def main():	
 	global  chat_log
 	chat_log = ''
 	while(True):
