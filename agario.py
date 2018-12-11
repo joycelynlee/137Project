@@ -2,6 +2,7 @@
 import pygame
 import random
 import math
+import game_packet_pb2
 ################################
 
 ####### imports for chat #######
@@ -10,10 +11,6 @@ import tcp_packet_pb2
 import socket
 import os
 import threading
-################################
-
-###### imports for udp #########
-import game_packet_pb2
 ################################
 
 from ctypes import *
@@ -118,6 +115,9 @@ cancelImg = pygame.image.load('Images/cancel.png')
 axbuttonImg = pygame.image.load('Images/a_x_button.png')
 aexitImg = pygame.image.load('Images/a_exit.png')
 acancelImg = pygame.image.load('Images/a_cancel.png')
+
+startImg = pygame.image.load('Images/start.png')
+startBImg = pygame.image.load('Images/start_b.png')
 ############################################
 def drawAdversaries():
 	# [name, xpos, ypos, img, score]	
@@ -144,15 +144,18 @@ def drawAdversaries():
 def updateScoreBoard(player, name):
 	global SCOREBOARD
 	SCOREBOARD.clear()
+	SCOREBOARD.append(['jm', 20])
+	SCOREBOARD.append(['kate', 10])
 	for i in range(3):
 		if ADVERSARIES[i][0] != -1:
 			SCOREBOARD.append([ADVERSARIES[i][0], ADVERSARIES[i][5]])
 	index = 0
-	SCOREBOARD.append([name, player.getscore()])
+	SCOREBOARD.append([name, player.get_score()])
+	SCOREBOARD.sort(key=lambda x: x[1], reverse=True)
 	for word in SCOREBOARD:	
 		bigText = pygame.font.Font("freesansbold.ttf", 15)
 		textSurf, textRect =  text_objects(str(SCOREBOARD[index]), bigText, maroon)
-		window.blit(textSurf, (1075, 40+(18*index)))	
+		window.blit(textSurf, (1072, 40+(33*index)))	
 		index += 1
 
 def getDistance(pos1,pos2):
@@ -163,8 +166,10 @@ def getDistance(pos1,pos2):
 
     return ((diffX**2)+(diffY**2))**(0.5)
 
-class Player(object):
-	def __init__(self, x, y):
+class Player(threading.Thread):
+	def __init__(self, name, x, y):
+		threading.Thread.__init__(self)
+		self.name = name
 		self.x = x
 		self.y = y 
 		self.speed = 1
@@ -176,13 +181,40 @@ class Player(object):
 		self.stopDis = 5
 		self.img = pygame.transform.scale(playerImg, (40, 40))
 
+	def get_name(self):
+		return self.name
+
+	def get_x(self):
+		return self.x
+	
+	def get_y(self):
+		return self.y
+
+	def get_score(self):
+		return self.score
+
+	def get_level(self):
+		return self.score/10+1
+
+	def get_size(self):
+		return self.get_level()*10
+
+	def get_speed(self): #amount of time in ms it takes for player to move 100u
+		return self.get_size()/5
+
+	def get_img(self):
+		return self.img
+
+	def get_image(self):
+		return 1
+
+	def get_score(self):
+		return self.score
+
 	def update(self):
 		self.move()
 		self.collisionDetection()
 		self.level_up()
-
-	def getscore(self):
-		return self.score
 
 	def level_up(self):
 		if self.score/(self.level*10) > 1:
@@ -193,6 +225,7 @@ class Player(object):
 	def move(self):
 		cX, cY = pygame.mouse.get_pos()
 		self.destination = (cX, cY)
+		# destination(cX, cY)
 		selfPosX, selfPosY = self.location
 
 		disToDes = (cX-selfPosX, cY-selfPosY)
@@ -292,6 +325,33 @@ def show_score():
 def show_sc():
 	img = pygame.transform.scale(scImg, (150, 150))
 	window.blit(img, (1045, 5))
+
+def gamePacketListener():
+	# global game_socket
+	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	sock.bind(('192.168.0.74', 1219))
+	# game_socket.bind(('192.168.0.74', 1218))
+	while True:
+		data = sock.recv(1024)
+		packet = game_packet_pb2.GamePacket.MovePacket()
+		packet.ParseFromString(data)
+		print(packet.player.name, "has moved to (", packet.newX, ",", packet.newY, ")")
+		# if (addr not in ENEMIES):
+		# 	ENEMIES.append(addr)
+
+def sendGamePackets():
+	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	cX, cY = pygame.mouse.get_pos()
+	packet = game_packet_pb2.GamePacket.MovePacket()
+	packet.type = 3
+	packet.player.name = player.get_name()
+	packet.player.xPos = player.get_x()
+	packet.player.yPos = player.get_y()
+	packet.player.score = player.get_score()
+	packet.player.image = player.get_image()
+	packet.newX = cX
+	packet.newY = cY
+	sock.sendto(packet.SerializeToString(), ('192.168.0.74', 1218))
 
 ###################################### chat #############################################
 def show_chat():
@@ -429,9 +489,8 @@ def createLobby(max_players):
 	return packet.lobby_id
 
 
-def startChat(name, lobby_id):
-	connectGame(name)	
-	global chatSocket
+def startChat():
+	global chatSocket, name, lobby_id
 
 	chatSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	chatSocket.connect(('202.92.144.45', 80))
@@ -446,17 +505,7 @@ def startChat(name, lobby_id):
 	packet.player.name = name
 	chatSocket.send(packet.SerializeToString())
 
-def connectGame(name):
-	global game_socket
-	game_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-	game_packet = game_packet_pb2.GamePacket.ConnectPacket()
-	game_packet.type = 1
-	game_packet.player.name = name
-	game_packet.player.image = playerImgInt
-	game_packet.update = game_packet_pb2.GamePacket.ConnectPacket.NEW		
-	game_packet.address = socket.gethostbyname(socket.gethostname())
-	game_socket.sendto(game_packet.SerializeToString(), ('192.168.0.74', 1218))	
+	game_loop()
 
 def startGame():
 	global name
@@ -474,6 +523,8 @@ def startGame():
 	active = False
 	text = 'Enter name here'
 	done = False
+	name = ''
+	lobby_id = ''
 
 	while not done:
 		for event in pygame.event.get():
@@ -547,15 +598,14 @@ def startGame():
 
 		pygame.display.flip()
 		clock.tick(30)
-
-	startChat(name, lobby_id)
-
+	startChat()
 #########################################################################################
 def game_loop():
 	pygame.mixer.music.play(-1)	
+	global name, game_socket	
 	x = (SCREEN_WIDTH * 0.45)
 	y = (SCREEN_HEIGHT * 0.45)
-	player = Player(x, y)
+	player = Player(name, x, y)
 	
 	font = pygame.font.Font(None, 25)
 	clock = pygame.time.Clock()
@@ -566,6 +616,24 @@ def game_loop():
 	active = False
 	text = 'Enter message here'
 	done = False
+
+	player.daemon = True
+	player.start()
+
+	game_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	packet = game_packet_pb2.GamePacket.ConnectPacket()
+	packet.type = 1
+	packet.player.name = name
+	packet.player.image = 1
+	packet.update = game_packet_pb2.GamePacket.ConnectPacket.NEW
+	packet.address = socket.gethostbyname(socket.gethostname())
+	game_socket.sendto(packet.SerializeToString(), ('192.168.0.74', 1218))
+
+	game_socket.close()
+
+	gameThread = threading.Thread(target = gamePacketListener)
+	gameThread.daemon = True
+	gameThread.start()
 
 	while not done:
 		window.fill(background)
