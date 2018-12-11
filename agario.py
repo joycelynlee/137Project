@@ -12,6 +12,10 @@ import os
 import threading
 ################################
 
+###### imports for udp #########
+import game_packet_pb2
+################################
+
 from ctypes import *
 from tkinter import *
 
@@ -51,22 +55,30 @@ clock = pygame.time.Clock()
 
 FOOD = []
 
+n = 3
+m = 6 # [name, id, xpos, ypos, img, size]
+ADVERSARIES = [[-1] * m] * n
+global SCOREBOARD
+SCOREBOARD = [[-1] * 2] * n
+
 # SOUND #
 ############################################
 global soundFlag
 soundFlag = 0
 
 eatSound = pygame.mixer.Sound('Sounds/eat.wav')
+goSound = pygame.mixer.Sound('Sounds/game_over.wav')
 pygame.mixer.music.load('Sounds/bgm.mp3')
 
-# pygame.mixer.music.load('Sounds/game_over.mp3')
 ############################################
 
 # IMAGES #
 ############################################
 # game images
 global playerImg
+global playerImgInt
 playerImg = pygame.image.load('Images/player.png')
+player1Img = pygame.image.load('Images/player.png')
 player2Img = pygame.image.load('Images/player2.png')
 player3Img = pygame.image.load('Images/player3.png')
 
@@ -107,6 +119,41 @@ axbuttonImg = pygame.image.load('Images/a_x_button.png')
 aexitImg = pygame.image.load('Images/a_exit.png')
 acancelImg = pygame.image.load('Images/a_cancel.png')
 ############################################
+def drawAdversaries():
+	# [name, xpos, ypos, img, score]	
+	for i in range(3):
+		if ADVERSARIES[i][0] != -1:
+			switch(ADVERSARIES[i][3])
+			if ADVERSARIES[i][3] == 1:	
+				img = player1Img
+			elif ADVERSARIES[i][3] == 2:					
+				img = player2Img	
+			elif ADVERSARIES[i][3] == 3:					
+				img = player3Img
+
+			if(ADVERSARIES[i][4] == 0):
+				img2 = pygame.transform.scale(img, (100, 100))
+			else:
+				size = score/10
+				temp = 90
+				for i in size:
+					size = temp * 1.2
+					temp = size
+			window.blit(img2, (temp,temp))
+
+def updateScoreBoard(player, name):
+	global SCOREBOARD
+	SCOREBOARD.clear()
+	for i in range(3):
+		if ADVERSARIES[i][0] != -1:
+			SCOREBOARD.append([ADVERSARIES[i][0], ADVERSARIES[i][5]])
+	index = 0
+	SCOREBOARD.append([name, player.getscore()])
+	for word in SCOREBOARD:	
+		bigText = pygame.font.Font("freesansbold.ttf", 15)
+		textSurf, textRect =  text_objects(str(SCOREBOARD[index]), bigText, maroon)
+		window.blit(textSurf, (1075, 40+(18*index)))	
+		index += 1
 
 def getDistance(pos1,pos2):
     px,py = pos1
@@ -133,6 +180,9 @@ class Player(object):
 		self.move()
 		self.collisionDetection()
 		self.level_up()
+
+	def getscore(self):
+		return self.score
 
 	def level_up(self):
 		if self.score/(self.level*10) > 1:
@@ -166,6 +216,22 @@ class Player(object):
 				pygame.mixer.Sound.play(eatSound)
 				self.score += 1
 				FOOD.remove(item)
+
+		# [name, id, xpos, ypos, img, score]	
+		for i in range(3):
+			if ADVERSARIES[i][0] != -1:
+				advx = ADVERSARIES[i][1]
+				advy = ADVERSARIES[i][2]
+				advimg = ADVERSARIES[i][3]
+				advsize = ADVERSARIES[i][4]
+				if(getDistance((advx+(advsize/2), advy+(advsize/2)), (self.x+(self.size/2), self.y+(self.size/2))) <= self.size):
+					if(self.size > advsize):
+						pygame.mixer.Sound.play(eatSound)
+						self.score += 1
+						ADVERSARIES.remove(i)
+					else:
+						pygame.mixer.Sound.play(goSound)
+						#end game call for the continue box
 
 	def render(self, window):
 		if(self.score == 0):
@@ -207,14 +273,14 @@ def choose_player_img():
 			if(e.type == pygame.QUIT):
 				exit_game(1)
 
-		window.blit(textSurf, (475, 100))
+		window.blit(textSurf, (475, 380))
 		mouse = pygame.mouse.get_pos()
 		a = pygame.transform.scale(playerImg, (200, 200))
 		b = pygame.transform.scale(player2Img, (200, 200))
 		c = pygame.transform.scale(player3Img, (200, 200))
-		menu_button(mouse, 220, 250, 200, 200, 220, 300, a, a, 11)
-		menu_button(mouse, 500, 250, 200, 200, 500, 300, b, b, 12)
-		menu_button(mouse, 780, 250, 200, 200, 780, 300, c, c, 13)				
+		menu_button(mouse, 220, 140, 200, 200, 220, 140, a, a, 11)
+		menu_button(mouse, 500, 140, 200, 200, 500, 140, b, b, 12)
+		menu_button(mouse, 780, 140, 200, 200, 780, 140, c, c, 13)				
 		
 		pygame.display.update()
 		clock.tick(20)	
@@ -364,6 +430,7 @@ def createLobby(max_players):
 
 
 def startChat(name, lobby_id):
+	connectGame(name)	
 	global chatSocket
 
 	chatSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -379,6 +446,18 @@ def startChat(name, lobby_id):
 	packet.player.name = name
 	chatSocket.send(packet.SerializeToString())
 
+def connectGame(name):
+	global game_socket
+	game_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+	game_packet = game_packet_pb2.GamePacket.ConnectPacket()
+	game_packet.type = 1
+	game_packet.player.name = name
+	game_packet.player.image = playerImgInt
+	game_packet.update = game_packet_pb2.GamePacket.ConnectPacket.NEW		
+	game_packet.address = socket.gethostbyname(socket.gethostname())
+	game_socket.sendto(game_packet.SerializeToString(), ('192.168.0.74', 1218))	
+
 def startGame():
 	global name
 	global lobby_id
@@ -386,7 +465,6 @@ def startGame():
 	#	SOURCE:
 	#	https://stackoverflow.com/questions/46390231/how-to-create-a-text-input-box-with-pygame
 	##########################
-
 	font = pygame.font.Font(None, 32)
 	clock = pygame.time.Clock()
 	input_box = pygame.Rect(530, 309, 140, 32)
@@ -471,6 +549,7 @@ def startGame():
 		clock.tick(30)
 
 	startChat(name, lobby_id)
+
 #########################################################################################
 def game_loop():
 	pygame.mixer.music.play(-1)	
@@ -524,11 +603,11 @@ def game_loop():
 						color = color_active if active else color_inactive
 
 		player.update()
-	
+		
 		spawn_food(len(FOOD))
 		for item in FOOD:
 			item.render(window)
-
+		drawAdversaries()
 		player.render(window)
 
 		# Render the current text.
@@ -540,6 +619,8 @@ def game_loop():
 		window.blit(txt_surface, (input_box.x+5, input_box.y+5))
 		# Blit the input_box rect.
 		pygame.draw.rect(window, color, input_box, 2)
+
+		updateScoreBoard(player, name)
 
 		show_chat()
 		show_sc()
@@ -558,6 +639,7 @@ def text_objects(text, font, color):
 def actions(action):
 	global htppage
 	global playerImg
+	global playerImgInt
 
 	if action == 1:
 		startGame()
@@ -586,13 +668,17 @@ def actions(action):
 	if action == 10:
 		choose_player_img()
 	if action == 11:
+		playerImgInt = 1
+		playerImg = player1Img
 		startGame()
 		game_loop()
 	if action == 12:
+		playerImgInt = 2
 		playerImg = player2Img
 		startGame()
 		game_loop()
 	if action == 13:
+		playerImgInt = 3
 		playerImg = player3Img
 		startGame()
 		game_loop()
