@@ -144,8 +144,6 @@ def drawAdversaries():
 def updateScoreBoard(player, name):
 	global SCOREBOARD
 	SCOREBOARD.clear()
-	SCOREBOARD.append(['jm', 20])
-	SCOREBOARD.append(['kate', 10])
 	for i in range(3):
 		if ADVERSARIES[i][0] != -1:
 			SCOREBOARD.append([ADVERSARIES[i][0], ADVERSARIES[i][5]])
