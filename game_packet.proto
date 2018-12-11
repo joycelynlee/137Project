@@ -1,0 +1,83 @@
+syntax = "proto2";
+
+import "game_player.proto";
+option java_package = "proto";
+option java_outer_classname = "TcpPacketProtos";
+
+message GamePacket {
+  enum PacketType {
+    DISCONNECT = 0;
+    CONNECT = 1;
+    CREATE_LOBBY = 2;
+    MOVE = 3;
+    PLAYER_LIST = 4;
+    END = 5;
+    ERR_LFULL= 6;
+    ERR = 7;
+  }
+
+  required PacketType type = 1;
+
+  message DisconnectPacket {
+    enum Update {
+      NORMAL = 0;
+      LOST = 1;
+    }
+
+    required PacketType type = 1;
+    optional GamePlayer player = 2;
+    optional DisconnectPacket.Update update = 3;
+  }
+
+  message ConnectPacket {
+    enum Update {
+      SELF = 0;
+      NEW = 1;
+    }
+
+    required PacketType type = 1;
+    required GamePlayer player = 2;
+    optional string lobby_id  = 3;
+    optional ConnectPacket.Update update = 4;
+    required string address = 5;
+  }
+
+  message CreateLobbyPacket {
+    required PacketType type = 1;
+    optional string lobby_id  = 2;
+    optional int32 max_players = 3;
+  }
+
+  message MovePacket {
+    required PacketType type = 1;
+    required GamePlayer player = 2;
+    optional int32 newX = 3;
+    optional int32 newY = 4;
+  }
+
+  message PlayerListPacket {
+    required PacketType type = 1;
+    repeated GamePlayer player_list = 3;
+  }
+
+  message EndPacket {
+    enum Condition {
+        LOSE = 0;
+        WIN = 1;
+    }
+
+    required PacketType type = 1;
+    required EndPacket.Condition condition = 2;
+  }
+
+  message ErrLfullPacket {
+    required PacketType type = 1;
+    optional string err_message = 2;
+  }
+
+  message ErrPacket {
+    required PacketType type = 1;
+    required string err_message = 2;
+  }
+
+}

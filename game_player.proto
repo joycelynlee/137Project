@@ -1,0 +1,14 @@
+syntax = "proto2";
+
+option java_package = "proto";
+option java_outer_classname = "PlayerProtos";
+
+
+message GamePlayer {
+  required string name = 1;
+  optional string id = 2;
+  optional int32 xPos = 3;
+  optional int32 yPos = 4;
+  optional int32 score = 5;
+  required int32 image = 6;
+}
