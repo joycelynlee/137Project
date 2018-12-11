@@ -12,15 +12,14 @@ Make sure to have protobuf for Python installed. There are installation instruct
 ## Usage
 First, run server.py. This will generate a lobby code that the players will use to enter the lobby.
 ```bash
-python3 server.py <arg1> <arg2>
+python3 server.py
 ```
 
 Then run client.py
 ```bash
-python3 client.py <arg1> <arg2>
+python3 client.py
 ```
-Players can join the room by also running client.py.
-Joining players must know the IP Address of the host(?).
+Players that want to join must run client.py
 
 ## Game Instructions and Mechanics
 1. To join a game room, you must enter your name and the lobby code.
